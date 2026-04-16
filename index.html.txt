@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>清朝条约信息系统 | HGIS 平台</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- 引入思源黑体与宋体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Noto+Serif+SC:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
+    <style>
+        /* ================= 学术规范色彩体系 ================= */
+        :root {
+            --color-bg: #F5F4F0;       /* 浅米灰 - 学术纸张背景 */
+            --color-ink: #1B2A47;      /* 墨蓝 - 主色调/正文/边框 */
+            --color-ochre: #A64B2A;    /* 赭石 - 强调色/割地高亮 */
+            --color-cyan: #78909C;     /* 淡青 - 次要信息/辅助图表 */
+            --color-brown: #D7CCC8;    /* 浅棕 - 模块分割线 */
+            --shadow-soft: 0 12px 40px rgba(27, 42, 71, 0.08);
+            --border-radius: 8px;
+        }
+
+        body { font-family: 'Noto Sans SC', sans-serif; background-color: var(--color-bg); color: var(--color-ink); line-height: 1.6; }
+        h1, h2, h3, h4, h5, .font-serif { font-family: 'Noto Serif SC', serif; }
+
+        /* ================= 极简导航栏 ================= */
+        .navbar-custom { background-color: rgba(245, 244, 240, 0.95); backdrop-filter: blur(10px); border-bottom: 1px solid var(--color-brown); padding: 1rem 0; }
+        .navbar-brand { font-weight: 900; color: var(--color-ink) !important; letter-spacing: 2px; }
+        .nav-link { color: var(--color-cyan) !important; font-weight: 500; letter-spacing: 1px; transition: 0.3s; margin-left: 1rem; }
+        .nav-link:hover, .nav-link.active { color: var(--color-ochre) !important; }
+
+        /* ================= 首页 Hero Banner ================= */
+        #home { height: 100vh; display: flex; align-items: center; background: linear-gradient(135deg, rgba(245, 244, 240, 1) 0%, rgba(215, 204, 200, 0.3) 100%); }
+        .hero-title { font-size: 4rem; font-weight: 900; color: var(--color-ink); margin-bottom: 1.5rem; line-height: 1.2; letter-spacing: 2px; }
+        .hero-subtitle { font-size: 1.15rem; color: var(--color-ink); font-weight: 400; max-width: 750px; margin-bottom: 3rem; text-align: justify; line-height: 1.8; }
+        .btn-custom { background-color: var(--color-ink); color: white; padding: 0.8rem 2.5rem; border-radius: 50px; font-weight: 500; transition: all 0.3s ease; border: 1px solid var(--color-ink); }
+        .btn-custom:hover { background-color: var(--color-ochre); border-color: var(--color-ochre); color: white; transform: translateY(-3px); box-shadow: var(--shadow-soft); }
+        .btn-outline-custom { background-color: transparent; color: var(--color-ink); border: 1px solid var(--color-ink); padding: 0.8rem 2.5rem; border-radius: 50px; font-weight: 500; transition: all 0.3s ease; }
+        .btn-outline-custom:hover { background-color: var(--color-ink); color: white; }
+
+        /* ================= 核心 GIS 地图页 ================= */
+        #gis-map-section { position: relative; height: 90vh; border-top: 1px solid var(--color-brown); border-bottom: 1px solid var(--color-brown); background: #e0f2fe; }
+        #map { width: 100%; height: 100%; z-index: 1; background: #c2d1d9; } 
+        
+        /* 高德地图底图：保留其原本清晰色彩，稍微调和对比度 */
+        .leaflet-layer { filter: contrast(1.05) brightness(1.02); }
+        
+        /* 汉字标注上图样式 (White Halo Effect) */
+        .custom-map-label {
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            padding: 0;
+            text-align: center;
+        }
+        .map-label-title {
+            font-weight: 900;
+            font-size: 14px;
+            color: #1B2A47;
+            /* 强烈的白色文字描边，确保在任何地形背景上都清晰 */
+            text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 0 0 8px #fff;
+            font-family: 'Noto Sans SC', sans-serif;
+            white-space: nowrap;
+        }
+        .map-label-sub {
+            font-weight: 900;
+            font-size: 11px;
+            color: #A64B2A;
+            text-shadow: 1.5px 1.5px 0 #fff, -1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff;
+            margin-top: -2px;
+            white-space: nowrap;
+        }
+        
+        .map-overlay-panel { position: absolute; z-index: 1000; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid var(--color-brown); border-radius: var(--border-radius); box-shadow: var(--shadow-soft); padding: 1.5rem; }
+        .panel-left { top: 30px; left: 30px; width: 360px; }
+        .panel-right { top: 30px; right: 30px; width: 320px; display: none; }
+
+        .form-range::-webkit-slider-thumb { background: var(--color-ochre); width: 22px; height: 22px; border: 4px solid white; box-shadow: 0 0 10px rgba(166, 75, 42, 0.6); }
+        .form-range::-webkit-slider-track { background: var(--color-brown); height: 8px; border-radius: 4px; }
+
+        /* ================= 排版与表格 ================= */
+        .section-title { font-size: 2.2rem; font-weight: 900; color: var(--color-ink); margin-bottom: 1rem; position: relative; padding-bottom: 0.8rem; }
+        .section-title::after { content: ''; position: absolute; bottom: 0; left: 0; width: 80px; height: 4px; background-color: var(--color-ochre); }
+        .card-custom { border: 1px solid var(--color-brown); border-radius: var(--border-radius); box-shadow: var(--shadow-soft); background: white; }
+        
+        .table-custom th { background-color: var(--color-ink); color: white; font-weight: 500; font-size: 0.9rem; padding: 1rem; border: none; position: sticky; top: 0; z-index: 10; }
+        .table-custom td { vertical-align: middle; color: var(--color-ink); font-size: 0.9rem; padding: 1rem; border-bottom: 1px solid var(--color-brown); }
+        .table-custom tbody tr:hover { background-color: rgba(215, 204, 200, 0.2); }
+        .filter-select { border: 1px solid var(--color-brown); border-radius: 50px; padding: 0.5rem 1rem; color: var(--color-ink); background-color: white; outline: none; font-size: 0.9rem;}
+        .filter-select:focus { border-color: var(--color-ochre); }
+        .badge-category { font-weight: 500; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.75rem; border: 1px solid; }
+
+        footer { background-color: var(--color-ink); color: rgba(255,255,255,0.6); padding: 4rem 0 2rem; font-size: 0.9rem; }
+    </style>
+</head>
+<body data-bs-spy="scroll" data-bs-target="#mainNav" data-bs-root-margin="0px 0px -40%" data-bs-smooth-scroll="true">
+
+    <!-- 1. 导航栏 -->
+    <nav id="mainNav" class="navbar navbar-expand-lg navbar-custom fixed-top">
+        <div class="container">
+            <a class="navbar-brand font-serif" href="#home"><i class="bi bi-globe-americas me-2"></i>清朝条约信息系统</a>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="#home">首页</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#gis-map-section">时空演变沙盘</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#analytics">多维统计图谱</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#database">全量条约文库</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 2. Hero Banner -->
+    <section id="home" class="container-fluid">
+        <div class="container">
+            <div class="row min-vh-100 align-items-center">
+                <div class="col-lg-9 pt-5">
+                    <div class="d-inline-block px-3 py-1 mb-4 rounded-pill font-serif" style="background-color: rgba(166, 75, 42, 0.1); color: var(--color-ochre); font-weight: 700; font-size: 0.9rem; letter-spacing: 2px;">
+                        历史地理信息科学 (HGIS) 综合平台
+                    </div>
+                    <h1 class="hero-title font-serif">清朝条约信息系统</h1>
+                    <p class="hero-subtitle">
+                        本系统系统梳理并整合了清代所有条约文献，将割地、口岸、边界等空间信息进行数字化处理，建成完整的条约时空数据库。平台支持按时间、地域、内容多维度查询检索，并以高清中文底图直观标注（汉字上图）与动态时序动画，直观呈现条约签订历程、领土变迁与通商口岸开放过程。为清代外交与疆域变迁研究提供直观、高效的数字化研究工具。
+                    </p>
+                    <div class="d-flex gap-3">
+                        <a href="#gis-map-section" class="btn btn-custom font-serif">进入演变沙盘 <i class="bi bi-arrow-right ms-2"></i></a>
+                        <a href="#database" class="btn btn-outline-custom font-serif"><i class="bi bi-database me-2"></i>检索条约文库</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. 核心 GIS 地图页 -->
+    <section id="gis-map-section">
+        <div id="map"></div>
+
+        <div class="map-overlay-panel panel-left">
+            <h4 class="font-serif mb-3 fw-bold" style="color: var(--color-ink);"><i class="bi bi-layers me-2 text-muted"></i>主权演化时空引擎</h4>
+            <p class="text-muted small mb-4" style="line-height: 1.8;">
+                高精度高德中文底图配合<strong style="color: var(--color-ochre);">直接汉字标注</strong>。拖动时间轴，跟随历史关键条约节点，见证大清版图的变迁历程。
+            </p>
+            
+            <div class="mb-2 mt-4">
+                <div class="d-flex justify-content-between align-items-end mb-2">
+                    <span class="small fw-bold text-uppercase" style="color: var(--color-cyan); letter-spacing: 1px;">Timeline</span>
+                    <span id="yearDisplay" class="fs-1 fw-bold font-serif" style="color: var(--color-ochre); line-height: 1;">1840</span>
+                </div>
+                <!-- 年份上限设为1912清亡 -->
+                <input type="range" class="form-range" id="yearSlider" min="1840" max="1912" step="1" value="1840">
+                
+                <!-- 严格按照关键条约布置的里程碑时间线 -->
+                <div class="d-flex justify-content-between small text-muted mt-3 font-serif text-center" style="font-size: 0.75rem; font-weight: 900;">
+                    <span style="color: var(--color-ink);">1842<br>南京</span>
+                    <span style="color: var(--color-ink);">1858<br>瑷珲/天津</span>
+                    <span style="color: var(--color-ink);">1860<br>北京</span>
+                    <span style="color: var(--color-ink);">1864<br>西北界约</span>
+                    <span style="color: var(--color-ink);">1895<br>马关</span>
+                    <span style="color: var(--color-ink);">1901<br>辛丑</span>
+                    <span style="color: var(--color-ink);">1911<br>满洲里</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="map-overlay-panel panel-right" id="detail-card">
+            <div class="d-flex justify-content-between align-items-start mb-3 border-b pb-2" style="border-color: var(--color-brown);">
+                <span id="detail-badge" class="badge" style="background-color: var(--color-ochre); font-weight: 500; font-size: 0.8rem;">要素类型</span>
+                <button type="button" class="btn-close" aria-label="Close" onclick="closeDetailCard()"></button>
+            </div>
+            <h3 id="detail-title" class="font-serif fw-bold mb-3" style="color: var(--color-ink);">地理要素名称</h3>
+            <table class="table table-sm table-borderless small mb-3">
+                <tbody>
+                    <tr><td class="text-muted" style="width: 80px;">法理依据</td><td id="detail-treaty" class="fw-bold font-serif" style="color: var(--color-ink);">--</td></tr>
+                    <tr><td class="text-muted">缔约年份</td><td id="detail-year" class="font-serif fw-bold">--</td></tr>
+                    <tr><td class="text-muted">攫取国家</td><td id="detail-country" class="fw-bold" style="color: var(--color-ochre);">--</td></tr>
+                </tbody>
+            </table>
+            <div class="p-3 mt-3" style="background-color: var(--color-bg); border-left: 3px solid var(--color-ochre);">
+                <p id="detail-desc" class="mb-0 small" style="color: var(--color-ink); text-align: justify; line-height: 1.6;">边界描述说明...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. 数据可视化分析页 -->
+    <section id="analytics" class="py-5" style="background-color: white;">
+        <div class="container py-5 my-4">
+            <h2 class="section-title font-serif">全量条约多维统计图谱</h2>
+            <p class="text-muted mb-5 font-serif" style="max-width: 800px; line-height: 1.8;">
+                导入 CSV 数据后，系统将自动通过 JS 算法生成国家维度、时间维度及九大主权受损分类的宏观统计模型，为历史学研究提供量化支撑。
+            </p>
+            <div class="row g-5">
+                <div class="col-lg-12 mb-2">
+                    <div class="card card-custom p-4 border-0" style="background-color: var(--color-bg);">
+                        <h5 class="font-serif fw-bold mb-4 text-center"><i class="bi bi-bar-chart-steps me-2"></i>九大核心侵害分类全景分布</h5>
+                        <div id="chartCategory" style="width: 100%; height: 350px;"></div>
+                    </div>
+                </div>
+                <div class="col-lg-7">
+                    <div class="card card-custom h-100 p-4 border-0">
+                        <h5 class="font-serif fw-bold mb-4"><i class="bi bi-graph-up me-2"></i>年代序列：历年条约签订数量趋势</h5>
+                        <div id="chartTimeline" style="width: 100%; height: 300px;"></div>
+                    </div>
+                </div>
+                <div class="col-lg-5">
+                    <div class="card card-custom h-100 p-4 border-0">
+                        <h5 class="font-serif fw-bold mb-4"><i class="bi bi-pie-chart me-2"></i>国家维度：列强攫取权益占比</h5>
+                        <div id="chartCountry" style="width: 100%; height: 300px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 5. 条约检索页 -->
+    <section id="database" class="py-5" style="background-color: var(--color-bg);">
+        <div class="container py-5 my-4">
+            <div class="row align-items-end mb-4">
+                <div class="col-md-12 mb-4">
+                    <h2 class="section-title font-serif">旧约章全量检索文库</h2>
+                    
+                    <!-- 本地导入区 -->
+                    <div class="d-flex justify-content-between align-items-center p-3 mt-4 shadow-sm" style="background-color: #fff; border-left: 4px solid var(--color-ochre); border-radius: var(--border-radius);">
+                        <div>
+                            <h5 class="fw-bold font-serif mb-1" style="color: var(--color-ink);">
+                                <i class="bi bi-database-add me-2"></i>本地条约数据集加载
+                            </h5>
+                            <p class="text-muted small mb-0">请选择并导入包含完整条约记录的 CSV 数据文件，以开启全量分析。</p>
+                        </div>
+                        <div class="ms-3 flex-shrink-0 d-flex align-items-center gap-2">
+                            <select id="csvEncoding" class="form-select font-serif shadow-sm" style="width: 140px; border-color: var(--color-ink);">
+                                <option value="GBK">GBK (Excel默认)</option>
+                                <option value="UTF-8">UTF-8</option>
+                            </select>
+                            
+                            <input type="file" id="csvFileInput" accept=".csv" class="d-none">
+                            <button onclick="document.getElementById('csvFileInput').click()" class="btn btn-custom font-serif shadow text-nowrap">
+                                <i class="bi bi-upload me-2"></i> 加载 CSV
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-12 d-flex gap-3 justify-content-md-end mt-2">
+                    <select id="filterCategory" class="filter-select font-serif shadow-sm" onchange="applyFilters()">
+                        <option value="all">所有九大分类</option>
+                        <option value="1. 割地类">1. 割地类 (领土/划界/租界)</option>
+                        <option value="2. 赔款类">2. 赔款类 (战争/军费/教案)</option>
+                        <option value="3. 通商贸易类">3. 通商贸易类 (开埠/关税/内河)</option>
+                        <option value="4. 司法特权类">4. 司法特权类 (领裁权/会审)</option>
+                        <option value="5. 军事驻军类">5. 军事驻军类 (驻军/控制要塞)</option>
+                        <option value="6. 传教文化类">6. 传教文化类 (传教自由/办学)</option>
+                        <option value="7. 外交政治类">7. 外交政治类 (内政干涉/特权)</option>
+                        <option value="8. 借款与路矿权类">8. 借款与路矿权类 (铁路/矿山)</option>
+                        <option value="9. 平等外交类">9. 平等外交类 (早期边界/友好)</option>
+                    </select>
+                    <!-- 国家过滤 -->
+                    <select id="filterCountry" class="filter-select font-serif shadow-sm" onchange="applyFilters()">
+                        <option value="all">所有缔约国家</option>
+                        <option value="英国">英国</option>
+                        <option value="俄国/苏联">俄国/苏联</option>
+                        <option value="日本">日本</option>
+                        <option value="法国">法国</option>
+                        <option value="德国">德国</option>
+                        <option value="美国">美国</option>
+                        <option value="葡萄牙">葡萄牙</option>
+                        <option value="各国(公约)">多国公约</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="card card-custom overflow-hidden border-0">
+                <div class="table-responsive" style="max-height: 600px;">
+                    <table class="table table-custom table-hover mb-0" id="treatyTable">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">条约名称</th>
+                                <th>签订时间</th>
+                                <th>缔约对象</th>
+                                <th>系统智能分类 (9大类)</th>
+                                <th class="text-center pe-4">空间关联</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- JS 动态渲染 -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="bg-white p-3 text-center border-top" style="border-color: var(--color-brown) !important;">
+                    <span class="small font-serif fw-bold" style="color: var(--color-ochre);" id="tableCount">当前仅加载了内置核心样本，请导入全量 CSV</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 6. 页脚 -->
+    <footer id="about">
+        <div class="container">
+            <div class="row mb-5">
+                <div class="col-md-5 mb-4 mb-md-0">
+                    <h4 class="font-serif text-white mb-4"><i class="bi bi-globe-americas me-2"></i>清朝条约信息系统</h4>
+                    <p style="color: rgba(255,255,255,0.6); max-width: 350px; text-align: justify;">
+                        本系统严格遵循历史地理信息科学规范，运用现代 Web 前端技术重构史料。通过极简的学术设计语言，将沉重的历史文本转化为清晰的时空数据模型。
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-white mb-4 font-serif">九大主权受损分类体系</h6>
+                    <div class="row" style="color: rgba(255,255,255,0.6); font-size: 0.85rem;">
+                        <div class="col-6">
+                            <ul class="list-unstyled space-y-2">
+                                <li>1. 割地与划界类</li>
+                                <li>2. 战争与教案赔款</li>
+                                <li>3. 通商与贸易</li>
+                                <li>4. 司法领裁特权</li>
+                                <li>5. 军事驻军与要塞</li>
+                            </ul>
+                        </div>
+                        <div class="col-6">
+                            <ul class="list-unstyled space-y-2">
+                                <li>6. 传教与文化渗透</li>
+                                <li>7. 政治外交干涉</li>
+                                <li>8. 路矿权与借款</li>
+                                <li>9. 双边平等条约</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <h6 class="text-white mb-4 font-serif">技术规格</h6>
+                    <ul class="list-unstyled" style="color: rgba(255,255,255,0.6); font-size: 0.85rem;">
+                        <li class="mb-2"><i class="bi bi-layers me-2"></i>架构：SPA + Bootstrap 5</li>
+                        <li class="mb-2"><i class="bi bi-map me-2"></i>底图：AutoNavi 空间约束引擎</li>
+                        <li class="mb-2"><i class="bi bi-pie-chart me-2"></i>数据：ECharts 5.0 + HTML5 API</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-top pt-4 text-center" style="border-color: rgba(255,255,255,0.1) !important;">
+                <p class="mb-0 font-serif" style="letter-spacing: 1px;">© 2026 GIS 毕业设计课题组. 严谨求实，鉴往知来。</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JS 依赖 -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+
+    <script>
+        // ==========================================
+        // 1. 核心算法：数据的九大分类智能归类器
+        // ==========================================
+        function categorizeTreaty(name) {
+            if (/界|割|让|交接|展拓|附属地|收回|租地|租界|划界|撤兵|势力范围|澳门/.test(name)) return '1. 割地类';
+            if (/赔偿|恤银|赔款|代金|债务|付还|赔/.test(name)) return '2. 赔款类';
+            if (/通商|贸易|海关|税则|章程|开埠|商埠|航行|关税|免税|船钞/.test(name)) return '3. 通商贸易类';
+            if (/法院|会审|裁判|教案|司法|诉讼|引渡|管辖|公廨/.test(name)) return '4. 司法特权类';
+            if (/驻军|炮台|防敌|军事|停战|军舰|海军|陆军|剿匪|要塞/.test(name)) return '5. 军事驻军类';
+            if (/传教|教堂|教士|文化|医院|买地|教务|办学/.test(name)) return '6. 传教文化类';
+            if (/专条|照会|协定|专约|条规|条款|领事|公使|干涉|内政/.test(name)) return '7. 外交政治类';
+            if (/铁路|矿|借款|电线|公司|电报|路|邮政|电车|银行/.test(name)) return '8. 借款与路矿权类';
+            if (/和好|修好|友好|平等|同盟|不侵犯/.test(name)) return '9. 平等外交类';
+            return '7. 外交政治类'; // 默认托底
+        }
+
+        function extractCountry(countryRaw) {
+            if (!countryRaw) return '其他';
+            if(countryRaw.includes('英')) return '英国';
+            if(countryRaw.includes('俄') || countryRaw.includes('苏')) return '俄国/苏联';
+            if(countryRaw.includes('日')) return '日本';
+            if(countryRaw.includes('法')) return '法国';
+            if(countryRaw.includes('德')) return '德国';
+            if(countryRaw.includes('美')) return '美国';
+            if(countryRaw.includes('葡')) return '葡萄牙';
+            if(countryRaw.includes('各')) return '各国(公约)';
+            return '其他';
+        }
+
+        // ==========================================
+        // 2. 空间点面数据集 (完全遵照关键时间线)
+        // ==========================================
+        const SPATIAL_FEATURES = [
+            // ============ 割让地 (Polygons) ============
+            { year: 1842, name: '香港岛', treaty: '南京条约', country: '英国', type: 'AREA', coordinates: [[22.283, 114.115], [22.287, 114.152], [22.285, 114.195], [22.280, 114.238], [22.245, 114.255], [22.215, 114.230], [22.202, 114.208], [22.228, 114.175], [22.223, 114.148], [22.240, 114.135], [22.283, 114.115]], desc: '中国近代史上第一块被正式割让的领土。' },
+            { year: 1858, name: '黑龙江以北', treaty: '瑷珲条约', country: '俄国/苏联', type: 'AREA', coordinates: [[53.0, 119.5], [53.8, 121.2], [54.2, 123.5], [54.8, 125.8], [55.3, 128.5], [54.9, 132.0], [55.4, 135.5], [54.6, 138.8], [54.0, 140.2], [53.2, 141.1], [52.8, 139.8], [53.1, 138.5], [52.4, 136.2], [52.7, 134.8], [51.9, 133.5], [51.5, 131.8], [51.8, 130.5], [51.2, 128.9], [51.6, 127.4], [52.8, 125.8], [53.2, 123.5], [52.8, 121.8], [53.0, 120.2], [53.0, 119.5]], desc: '割让外兴安岭以南、黑龙江以北 60 多万平方公里土地。' },
+            { year: 1860, name: '九龙半岛', treaty: '北京条约', country: '英国', type: 'AREA', coordinates: [[22.325, 114.155], [22.325, 114.195], [22.290, 114.200], [22.290, 114.150], [22.325, 114.155]], desc: '割让界限街以南的九龙半岛。' },
+            { year: 1860, name: '乌苏里江以东', treaty: '北京条约', country: '俄国/苏联', type: 'AREA', coordinates: [[48.4, 134.8], [47.5, 135.2], [46.2, 134.5], [45.1, 133.8], [44.6, 132.5], [43.8, 131.9], [42.8, 130.6], [42.3, 130.4], [42.6, 131.5], [42.8, 133.0], [43.5, 135.2], [44.8, 137.4], [46.2, 139.5], [48.5, 140.8], [50.8, 141.5], [52.5, 142.2], [53.6, 141.8], [53.2, 141.2], [54.0, 140.2], [54.6, 138.8], [52.8, 137.5], [50.5, 136.2], [48.4, 134.8]], desc: '以乌苏里江和锡霍特山脉为界，割让含海参崴在内领土。' },
+            { year: 1864, name: '外西北', treaty: '勘分西北界约记', country: '俄国/苏联', type: 'AREA', coordinates: [[42.8, 73.5], [43.5, 75.2], [43.8, 77.4], [44.2, 79.5], [45.6, 81.2], [46.8, 82.8], [47.9, 83.5], [47.2, 81.5], [46.5, 79.8], [46.8, 77.5], [46.2, 75.2], [45.5, 73.8], [44.2, 72.5], [42.8, 73.5]], desc: '沿巴尔喀什湖以东以南划界，割占大片西北领土。' },
+            { year: 1887, name: '澳门', treaty: '和好通商条约', country: '葡萄牙', type: 'AREA', coordinates: [[22.215, 113.535], [22.215, 113.560], [22.180, 113.560], [22.180, 113.530], [22.215, 113.535]], desc: '正式承认葡萄牙永驻管理澳门。' },
+            { year: 1895, name: '台湾及澎湖', treaty: '马关条约', country: '日本', type: 'AREA', coordinates: [[25.10, 121.95], [24.60, 121.80], [24.10, 121.65], [23.40, 121.40], [22.80, 121.15], [22.00, 120.90], [21.90, 120.75], [22.30, 120.50], [22.80, 120.25], [23.40, 120.05], [24.10, 120.20], [24.60, 120.65], [24.95, 121.05], [25.20, 121.45], [25.25, 121.75], [25.10, 121.95]], desc: '甲午战败，割让台湾全岛及附属岛屿。' },
+            { year: 1898, name: '胶州湾', treaty: '胶澳租界条约', country: '德国', type: 'AREA', coordinates: [[36.15, 120.23], [36.18, 120.32], [36.16, 120.42], [36.08, 120.45], [36.00, 120.38], [35.98, 120.28], [36.02, 120.20], [36.08, 120.15], [36.15, 120.23]], desc: '强租胶州湾 99 年。' },
+            { year: 1898, name: '旅大', treaty: '旅大租地条约', country: '俄国/苏联', type: 'AREA', coordinates: [[38.82, 121.12], [38.85, 121.45], [38.88, 121.85], [39.05, 122.15], [39.25, 121.95], [39.35, 121.65], [39.15, 121.45], [39.05, 121.25], [38.82, 121.12]], desc: '强租大连湾及旅顺口 25 年。' },
+            { year: 1898, name: '新界', treaty: '展拓香港界址专条', country: '英国', type: 'AREA', coordinates: [[22.50, 113.80], [22.55, 114.30], [22.40, 114.40], [22.33, 114.20], [22.33, 113.80], [22.50, 113.80]], desc: '强租深圳河以南、界限街以北的九龙。' },
+            { year: 1899, name: '广州湾', treaty: '广州湾租界条约', country: '法国', type: 'AREA', coordinates: [[21.20, 110.30], [21.20, 110.60], [20.90, 110.60], [20.90, 110.30], [21.20, 110.30]], desc: '强租广东湛江海湾及周边 99 年。' },
+            { year: 1911, name: '满洲里周边', treaty: '满洲里界约', country: '俄国/苏联', type: 'AREA', coordinates: [[49.6, 117.4], [49.8, 118.0], [49.4, 118.2], [49.3, 117.5], [49.6, 117.4]], desc: '晚清最后一次割地，满洲里附近水陆洲岛划归俄国。' },
+
+            // ============ 通商口岸与据点 (Points) ============
+            { year: 1842, name: '广州', type: 'PORT', coordinates: [23.13, 113.26], country: '英国', treaty: '南京条约', desc: '五口通商之一，打破十三行独揽局面。' },
+            { year: 1842, name: '厦门', type: 'PORT', coordinates: [24.48, 118.08], country: '英国', treaty: '南京条约', desc: '五口通商之一。' },
+            { year: 1842, name: '福州', type: 'PORT', coordinates: [26.08, 119.30], country: '英国', treaty: '南京条约', desc: '五口通商之一。' },
+            { year: 1842, name: '宁波', type: 'PORT', coordinates: [29.88, 121.55], country: '英国', treaty: '南京条约', desc: '五口通商之一。' },
+            { year: 1842, name: '上海', type: 'PORT', coordinates: [31.23, 121.47], country: '英国', treaty: '南京条约', desc: '五口通商之一，迅速发展为远东枢纽。' },
+            { year: 1858, name: '汉口', type: 'PORT', coordinates: [30.58, 114.27], country: '英国', treaty: '天津条约', desc: '“九省通衢”，列强势力深入长江腹地。' },
+            { year: 1860, name: '天津', type: 'PORT', coordinates: [39.08, 117.20], country: '法国', treaty: '北京条约', desc: '京畿门户洞开，威胁清廷心脏。' },
+            { year: 1876, name: '宜昌', type: 'PORT', coordinates: [30.69, 111.28], country: '英国', treaty: '烟台条约', desc: '扼守川鄂咽喉，外轮继续上溯。' },
+            { year: 1895, name: '重庆', type: 'PORT', coordinates: [29.56, 106.55], country: '日本', treaty: '马关条约', desc: '外轮深入四川盆地。' },
+            { year: 1901, name: '使馆界(驻军)', treaty: '辛丑条约', country: '各国(公约)', type: 'PORT', coordinates: [39.90, 116.40], desc: '划定北京东交民巷为使馆界，允许各国驻军保护，中国人不得居住。' },
+            { year: 1901, name: '大沽口要塞', treaty: '辛丑条约', country: '各国(公约)', type: 'PORT', coordinates: [39.00, 117.70], desc: '拆除大沽炮台，允许列强在京山铁路沿线驻军要塞。' }
+        ];
+
+        // 初始内置简易样本
+        let fullDatabase = [
+            { id: "1", date: "1842-08-29", year: 1842, name: "江宁条约（南京条约）", countryRaw: "英国", country: "英国", category: "1. 割地类" },
+            { id: "2", date: "1858-05-28", year: 1858, name: "瑷珲城和约", countryRaw: "俄国", country: "俄国/苏联", category: "1. 割地类" },
+            { id: "3", date: "1860-10-24", year: 1860, name: "北京条约", countryRaw: "英国", country: "英国", category: "1. 割地类" },
+            { id: "4", date: "1860-11-14", year: 1860, name: "北京续增条约", countryRaw: "俄国", country: "俄国/苏联", category: "1. 割地类" },
+            { id: "5", date: "1864-10-07", year: 1864, name: "勘分西北界约记", countryRaw: "俄国", country: "俄国/苏联", category: "1. 割地类" },
+            { id: "6", date: "1876-09-13", year: 1876, name: "烟台条约", countryRaw: "英国", country: "英国", category: "3. 通商贸易类" },
+            { id: "152", date: "1887-12-01", year: 1887, name: "中葡和好通商条约", countryRaw: "葡萄牙", country: "葡萄牙", category: "1. 割地类" },
+            { id: "7", date: "1895-04-17", year: 1895, name: "马关新约", countryRaw: "日本", country: "日本", category: "1. 割地类" },
+            { id: "9", date: "1901-09-07", year: 1901, name: "辛丑各国和约", countryRaw: "各国", country: "各国(公约)", category: "5. 军事驻军类" },
+            { id: "10", date: "1911-12-20", year: 1911, name: "满洲里界约", countryRaw: "俄国", country: "俄国/苏联", category: "1. 割地类" }
+        ];
+
+        const COLOR_MAP = {
+            '英国': '#1B2A47', '俄国/苏联': '#A64B2A',
+            '日本': '#B8860B', '法国': '#78909C', '德国': '#5D4037',
+            '美国': '#8D6E63', '葡萄牙': '#9333ea', '各国(公约)': '#455A64', '其他': '#9E9E9E'
+        };
+
+        // ==========================================
+        // 3. 文件上传引擎 (解决 Excel CSV 乱码问题)
+        // ==========================================
+        document.getElementById('csvFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const encoding = document.getElementById('csvEncoding').value;
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const text = e.target.result;
+                parseCSV(text);
+                document.getElementById('csvFileInput').value = '';
+            };
+            reader.readAsText(file, encoding);
+        });
+
+        function parseCSV(csvText) {
+            fullDatabase = [];
+            const rows = csvText.trim().split('\n');
+            let startIndex = 0;
+            if (rows[0].includes('名称') || rows[0].includes('name')) startIndex = 1;
+
+            for (let i = startIndex; i < rows.length; i++) {
+                const line = rows[i].trim();
+                if(!line) continue;
+                
+                const cols = line.split(','); 
+                if (cols.length >= 4) {
+                    const id = cols[0];
+                    const date = cols[1];
+                    const name = cols[2];
+                    const countryRaw = cols[3];
+                    
+                    const yearMatch = date.match(/^\d{4}/);
+                    const year = yearMatch ? parseInt(yearMatch[0]) : 1840;
+
+                    fullDatabase.push({
+                        id: id, date: date, year: year, name: name, countryRaw: countryRaw,
+                        country: extractCountry(countryRaw), category: categorizeTreaty(name)
+                    });
+                }
+            }
+            alert(`✅ 成功导入 ${fullDatabase.length} 条真实数据！\n图表即将重新渲染。`);
+            applyFilters();
+            document.getElementById('tableCount').innerText = `全量 ${fullDatabase.length} 条历史数据已成功载入`;
+        }
+
+        // ==========================================
+        // 4. Leaflet 高清地图初始化 (全中文高德底图 + 汉字上图)
+        // ==========================================
+        // 定义东亚严密边界框，禁止拖动到世界其他地区
+        const bounds = [[0, 60], [60, 160]];
+
+        const map = L.map('map', { 
+            zoomControl: false,
+            maxBounds: bounds,         
+            maxBoundsViscosity: 1.0,   
+            minZoom: 4                 
+        }).setView([35.0, 105.0], 4.5);
+
+        // 采用高德中文底图，满足全中文标注需求，无需代理。
+        L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+            subdomains: ['1', '2', '3', '4'],
+            attribution: '&copy; 高德地图 (AutoNavi) | HGIS 2026',
+            bounds: bounds
+        }).addTo(map);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        let featureLayerGroup = L.featureGroup().addTo(map);
+        let currentYear = 1840;
+
+        function renderMap(year) {
+            featureLayerGroup.clearLayers();
+            
+            SPATIAL_FEATURES.forEach(item => {
+                if (item.year <= year) {
+                    const color = COLOR_MAP[item.country] || '#1B2A47';
+                    let layer;
+
+                    if (item.type === 'AREA') {
+                        layer = L.polygon(item.coordinates, {
+                            color: color, weight: 2, dashArray: '4, 4',
+                            fillColor: color, fillOpacity: 0.35
+                        });
+                    } else if (item.type === 'PORT') {
+                        layer = L.circleMarker(item.coordinates, {
+                            radius: 6, color: '#fff', weight: 1.5,
+                            fillColor: color, fillOpacity: 0.9
+                        });
+                    }
+                    
+                    if (layer) {
+                        // 汉字标注上图 (永久显示，白底黑字防重影)
+                        const labelOffset = item.type === 'PORT' ? [12, 0] : [0, 0];
+                        const labelDirection = item.type === 'PORT' ? 'right' : 'center';
+                        
+                        layer.bindTooltip(`
+                            <div class="map-label-title">${item.name}</div>
+                            <div class="map-label-sub">(${item.treaty})</div>
+                        `, {
+                            permanent: true,
+                            direction: labelDirection,
+                            className: 'custom-map-label',
+                            offset: labelOffset
+                        });
+                        
+                        layer.on('click', () => showMapDetail(item));
+                        layer.addTo(featureLayerGroup);
+                    }
+                }
+            });
+        }
+
+        // ==========================================
+        // 5. 数据库过滤与 ECharts 图表引擎
+        // ==========================================
+        const tableBody = document.getElementById('tableBody');
+        const countDisplay = document.getElementById('tableCount');
+        
+        const chartCat = echarts.init(document.getElementById('chartCategory'));
+        const chartTime = echarts.init(document.getElementById('chartTimeline'));
+        const chartCountry = echarts.init(document.getElementById('chartCountry'));
+
+        function applyFilters() {
+            const catFilter = document.getElementById('filterCategory').value;
+            const countryFilter = document.getElementById('filterCountry').value;
+            
+            const filteredData = fullDatabase.filter(d => {
+                let pass = true;
+                if (catFilter !== 'all' && d.category !== catFilter) pass = false;
+                if (countryFilter !== 'all' && d.country !== countryFilter) pass = false;
+                return pass;
+            });
+
+            tableBody.innerHTML = '';
+            filteredData.forEach(item => {
+                const hasPolygon = SPATIAL_FEATURES.some(p => p.treaty.includes(item.name) || item.name.includes(p.treaty) || item.name.includes(p.name));
+                const badgeStyle = `background-color: rgba(27,42,71,0.05); color: var(--color-ink); border: 1px solid var(--color-brown);`;
+                
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="ps-4 fw-bold font-serif" style="color: var(--color-ink)">${item.name}</td>
+                    <td class="font-serif">${item.date}</td>
+                    <td><span class="badge" style="background-color: ${COLOR_MAP[item.country]}; opacity: 0.9">${item.countryRaw}</span></td>
+                    <td><span class="badge badge-category" style="${badgeStyle}">${item.category.substring(2)}</span></td>
+                    <td class="text-center pe-4 text-muted small">
+                        ${hasPolygon ? '<i class="bi bi-map-fill text-danger" title="包含空间坐标"></i>' : '<i class="bi bi-file-earmark-text" title="纯文本"></i>'}
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+            if(fullDatabase.length > 10) {
+                countDisplay.innerText = `过滤后共显示 ${filteredData.length} 条约章记录`;
+            }
+
+            updateCharts(filteredData);
+        }
+
+        function updateCharts(data) {
+            const catData = {}; const timeData = {}; const countryData = {};
+
+            data.forEach(d => {
+                catData[d.category] = (catData[d.category] || 0) + 1;
+                const decade = Math.floor(d.year / 10) * 10;
+                timeData[decade] = (timeData[decade] || 0) + 1;
+                countryData[d.country] = (countryData[d.country] || 0) + 1;
+            });
+
+            const catNames = ['1. 割地类', '2. 赔款类', '3. 通商贸易类', '4. 司法特权类', '5. 军事驻军类', '6. 传教文化类', '7. 外交政治类', '8. 借款与路矿权类', '9. 平等外交类'];
+            const catValues = catNames.map(c => catData[c] || 0);
+            
+            chartCat.setOption({
+                tooltip: { trigger: 'axis' },
+                grid: { left: '15%', right: '5%', top: '5%', bottom: '10%' },
+                xAxis: { type: 'value', splitLine: { show: false } },
+                yAxis: { type: 'category', data: catNames.map(c => c.split(' ')[1]), axisLabel: { color: '#78909C', fontSize: 11, fontFamily: 'serif' } },
+                series: [{ 
+                    type: 'bar', data: catValues, 
+                    itemStyle: { color: '#1B2A47', borderRadius: [0, 4, 4, 0] },
+                    label: { show: true, position: 'right', color: '#A64B2A' }
+                }]
+            });
+
+            const decades = Object.keys(timeData).sort((a, b) => parseInt(a) - parseInt(b));
+            const timeValues = decades.map(d => timeData[d]);
+            chartTime.setOption({
+                tooltip: { trigger: 'axis' },
+                grid: { left: '8%', right: '5%', top: '10%', bottom: '15%' },
+                xAxis: { type: 'category', data: decades, axisLabel: { color: '#78909C' } },
+                yAxis: { type: 'value', splitLine: { lineStyle: { type: 'dashed', color: '#D7CCC8' } } },
+                series: [{ 
+                    type: 'line', data: timeValues, smooth: true, 
+                    areaStyle: { color: 'rgba(166, 75, 42, 0.1)' }, 
+                    lineStyle: { color: '#A64B2A', width: 3 },
+                    itemStyle: { color: '#A64B2A' }
+                }]
+            });
+
+            const pieSeries = Object.keys(countryData).map(k => ({ name: k, value: countryData[k] }));
+            chartCountry.setOption({
+                tooltip: { trigger: 'item' },
+                color: [COLOR_MAP['英国'], COLOR_MAP['俄国/苏联'], COLOR_MAP['日本'], COLOR_MAP['法国'], COLOR_MAP['美国'], COLOR_MAP['德国'], COLOR_MAP['葡萄牙'], COLOR_MAP['各国(公约)']],
+                series: [{
+                    type: 'pie', radius: ['40%', '70%'], avoidLabelOverlap: false,
+                    itemStyle: { borderRadius: 4, borderColor: '#fff', borderWidth: 2 },
+                    label: { color: '#1B2A47', fontFamily: 'serif' },
+                    data: pieSeries
+                }]
+            });
+        }
+
+        // ==========================================
+        // 6. UI 联动与交互控制
+        // ==========================================
+        const yearSlider = document.getElementById('yearSlider');
+        const yearDisplay = document.getElementById('yearDisplay');
+
+        yearSlider.addEventListener('input', function() {
+            currentYear = this.value;
+            yearDisplay.innerText = currentYear;
+            closeDetailCard();
+            renderMap(currentYear);
+        });
+
+        function showMapDetail(item) {
+            document.getElementById('detail-badge').innerText = item.type === 'AREA' ? '割让/租借/驻军' : '通商口岸';
+            document.getElementById('detail-badge').style.backgroundColor = item.type === 'AREA' ? 'var(--color-ochre)' : 'var(--color-ink)';
+            document.getElementById('detail-title').innerText = item.name;
+            document.getElementById('detail-treaty').innerText = `《${item.treaty}》`;
+            document.getElementById('detail-year').innerText = `${item.year} 年`;
+            document.getElementById('detail-country').innerText = item.country;
+            document.getElementById('detail-country').style.color = COLOR_MAP[item.country] || '#A64B2A';
+            document.getElementById('detail-desc').innerText = item.desc;
+            
+            const card = document.getElementById('detail-card');
+            card.style.display = 'block';
+            card.style.opacity = 0;
+            setTimeout(() => card.style.opacity = 1, 50);
+            
+            // 聚焦坐标
+            let centerLat, centerLng;
+            if(item.type === 'AREA') {
+                centerLat = item.coordinates.reduce((acc, val) => acc + val[0], 0) / item.coordinates.length;
+                centerLng = item.coordinates.reduce((acc, val) => acc + val[1], 0) / item.coordinates.length;
+                map.flyTo([centerLat, centerLng], 6, { duration: 1.5 });
+            } else {
+                map.flyTo([item.coordinates[0], item.coordinates[1]], 6, { duration: 1.5 });
+            }
+        }
+
+        function closeDetailCard() { document.getElementById('detail-card').style.display = 'none'; }
+        window.addEventListener('resize', () => { chartCat.resize(); chartTime.resize(); chartCountry.resize(); map.invalidateSize(); });
+
+        window.onload = () => {
+            renderMap(currentYear);
+            applyFilters();
+        };
+    </script>
+</body>
+</html>
